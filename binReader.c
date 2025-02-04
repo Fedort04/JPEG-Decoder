@@ -55,7 +55,7 @@ ushort get_word()
         ans += getc(src);
     }
     else {
-        ushort temp = getc(src);
+        int temp = getc(src);
         temp = temp << 8;
         ans += temp;
     }

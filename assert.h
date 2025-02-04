@@ -1,0 +1,1 @@
+void ASSERT(int first, int second);

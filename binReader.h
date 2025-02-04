@@ -1,4 +1,4 @@
-typedef struct {
+typedef struct bit4_s{
     unsigned char first;
     unsigned char second;
 } bit4;
