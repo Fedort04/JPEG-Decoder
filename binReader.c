@@ -16,7 +16,7 @@ void set_bin_src(char *source)
 {
     char *filename;
     if (source == NULL)
-        *filename = "Aqours.jpg";
+        filename = "Aqours.jpg";
     else 
         filename = source;
     src = fopen(filename, "rb");
@@ -47,15 +47,15 @@ short get_next_byte()
 }
 
 //Возвращает очередные два байта
-short get_word()
+int get_word()
 {
-    short ans = getc(src);
+    int ans = getc(src);
     if (cur_endianness == 'b') {   
         ans = ans << 8;
         ans += getc(src);
     }
     else {
-        short temp = getc(src);
+        int temp = getc(src);
         temp = temp << 8;
         ans += temp;
     }
@@ -91,7 +91,7 @@ short get_bit()
         short temp = cur_byte >> ++bit_count;
         return temp & 1;
     }
-    return NULL;
+    return -1;
 }
 
 //Читает n бит

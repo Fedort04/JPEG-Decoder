@@ -7,7 +7,7 @@ void set_bin_src(char *source);
 void set_endiann(char order);
 short get_byte();
 short get_next_byte();
-short get_word();
+int get_word();
 bit4 get_4bit();
 short get_bit();
 short get_bits(short n);
