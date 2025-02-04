@@ -7,9 +7,9 @@ FILE *src;
 ///"b" - big endianness, "l" - little endianness
 char cur_endianness = 'b';
 ///Счетчик бит в текущем байте
-short bit_count;
+ushort bit_count;
 ///Текущее значение байта для побитового чтения
-short cur_byte;
+ushort cur_byte;
 
 //Устанавливает источник для чтения байт
 void set_bin_src(char *source)
@@ -33,29 +33,29 @@ void set_endiann(char order)
 }
 
 //Возвращает очередной байт
-short get_byte()
+ushort get_byte()
 {
     return getc(src);
 }
 
 //Возвращает следующий байт без изменения указателя
-short get_next_byte()
+ushort get_next_byte()
 {
-    short ans = getc(src);
+    ushort ans = getc(src);
     fseek(src, -1, SEEK_CUR);
     return ans;
 }
 
 //Возвращает очередные два байта
-int get_word()
+ushort get_word()
 {
-    int ans = getc(src);
+    ushort ans = getc(src);
     if (cur_endianness == 'b') {   
         ans = ans << 8;
         ans += getc(src);
     }
     else {
-        int temp = getc(src);
+        ushort temp = getc(src);
         temp = temp << 8;
         ans += temp;
     }
@@ -65,7 +65,7 @@ int get_word()
 //Возвращает структуру с парой 4 бит
 bit4 get_4bit()
 {
-    short temp = getc(src);
+    ushort temp = getc(src);
     bit4 ans;
     ans.first = temp >> 4;
     ans.second = temp & 15;
@@ -73,14 +73,14 @@ bit4 get_4bit()
 }
 
 //Возвращает очередной бит
-short get_bit()
+ushort get_bit()
 {
     if (cur_endianness == 'b') {
         if (bit_count == 0) {
             cur_byte = get_byte();
             bit_count = 8;
         }
-        short temp = cur_byte >> --bit_count;
+        ushort temp = cur_byte >> --bit_count;
         return temp & 1;
     }
     else if (cur_endianness == 'l') {
@@ -88,17 +88,17 @@ short get_bit()
             cur_byte = get_byte();
             bit_count = -1;
         }
-        short temp = cur_byte >> ++bit_count;
+        ushort temp = cur_byte >> ++bit_count;
         return temp & 1;
     }
     return -1;
 }
 
 //Читает n бит
-short get_bits(short n)
+ushort get_bits(ushort n)
 {
-    short ans = 0;
-    for (short i = 0; i < n; ++i) {
+    ushort ans = 0;
+    for (ushort i = 0; i < n; ++i) {
         ans = ans << 1;
         ans += get_bit();
     }
@@ -106,10 +106,10 @@ short get_bits(short n)
 }
 
 //Читает n байт
-short *get_array(short n)
+ushort *get_array(ushort n)
 {
-    short *res = calloc(n, sizeof(short));
-    for (short i = 0; i < n; ++i)
+    ushort *res = calloc(n, sizeof(ushort));
+    for (ushort i = 0; i < n; ++i)
         res[i] = get_byte();
     return res;
 }
