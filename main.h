@@ -1,5 +1,7 @@
 #define NUM_OF_TABLES 4 //Максимальное количество таблиц Хаффмана или квантования
 #define QUANT_TABLE_SIZE 64 //Количество элементов в таблице квантования
+#define NUM_HUFF_CODE_LEN 16 //Количество длин кодов Хаффмана
+#define MAX_NUM_HUFF_SYM 162 //Максимальное количество символов в таблице Хаффмана
 
 typedef unsigned short ushort;
 typedef unsigned char uchar;

@@ -52,7 +52,34 @@ void read_quant_table()
     }
 }
 
+//Чтение и конструирование таблицы Хаффмана
+void read_huff_table()
+{
+    ushort lh = get_word();
+    bit4 tcth = get_4bit();
+    uchar *offset = calloc(NUM_HUFF_CODE_LEN + 1, sizeof(uchar));
+    offset[0] = 0;
+    uchar sum_elem = 0;
+    for (int i = 1; i < NUM_HUFF_CODE_LEN + 1; ++i)
+    {
+        sum_elem += get_byte();
+        offset[i] = sum_elem;
+    }
+    if (sum_elem > MAX_NUM_HUFF_SYM)
+    {
+        printf("read_huff_table -> Error: incorrect number of symbols");
+        return;
+    }
+    uchar *symbols = calloc(sum_elem, sizeof(uchar));
+    for (int i = 0; i < sum_elem; ++i)
+    {
+        symbols[i] = get_byte();
+    }
+    //Коструирование таблицы из прочтенных данных!!
+}
+
 //Чтение таблиц и прочих мелких сегментов
+//return следующие за сегментами два байта
 ushort read_tables()
 {
    ushort temp = get_word();
@@ -65,6 +92,11 @@ ushort read_tables()
     else if (temp == DQT)
     {
         read_quant_table();
+        next = 1;
+    }
+    else if (temp == DHT)
+    {
+        read_huff_table();
         next = 1;
     }
     if (next)
@@ -96,6 +128,12 @@ void read_frame_header()
     }
 }
 
+//Чтение сегмента скана
+void read_scan()
+{
+    ushort marker = read_tables();
+}
+
 //Чтение кадра
 void read_frame()
 {
@@ -106,6 +144,7 @@ void read_frame()
         return;
     }
     read_frame_header();
+    read_scan();
 }
 
 //Чтение файла основной
