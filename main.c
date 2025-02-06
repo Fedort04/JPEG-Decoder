@@ -5,11 +5,17 @@
 #include "main.h"
 
 ushort *quant_tables[NUM_OF_TABLES]; //Массив таблиц квантования
+huff_table *DC_tables[NUM_OF_TABLES]; //Массив таблиц Хаффмана для DC
+huff_table *AC_tables[NUM_OF_TABLES]; //Массив таблиц Хаффмана для АС
 ushort sample_precision; //precision of bits
 ushort x; //Ширина
 ushort y; //Высота
 ushort nf; //Кол-во компонент
 component **comps; //Массив ссылок на данные о компонентах
+ushort restart_interval = 0; //Перезапуск MCU, по умолчанию 0
+ushort start_spectral = 0;
+ushort end_spectral = 63;
+bit4 ahal;
 
 //Чтение маркера marker
 //return 1, если маркер прочитан корректно
@@ -71,11 +77,45 @@ void read_huff_table()
         return;
     }
     uchar *symbols = calloc(sum_elem, sizeof(uchar));
+    uint *codes = calloc(sum_elem, sizeof(uint));
     for (int i = 0; i < sum_elem; ++i)
     {
         symbols[i] = get_byte();
     }
-    //Коструирование таблицы из прочтенных данных!!
+    huff_table *temp = make_huff_table(offset, symbols, codes);
+    get_huff_table(temp);
+    if (tcth.second > 3)
+    {
+        printf("read_huff_table -> Error: incorrect table destination");
+        return;
+    }
+    char sym = 'e';
+    if (tcth.first == 0)
+    {
+        DC_tables[tcth.second] = temp;
+        sym = 'D';
+    }
+    else if (tcth.first == 1)
+    {
+        AC_tables[tcth.second] = temp;
+        sym = 'A';
+    }
+    else 
+    {
+        printf("read_huff_table -> Error: incorrect table ID");
+        return;
+    }
+    printf("DHT\n");
+    printf("%cC-table %d\n\n", sym, tcth.second);
+}
+
+//Чтение сегмента с перезапуском
+void read_restart_interval()
+{
+    printf("DRI\n");
+    ushort lr = get_word();
+    restart_interval = get_word();
+    printf("restart-interval: %d\n\n", restart_interval);
 }
 
 //Чтение таблиц и прочих мелких сегментов
@@ -99,6 +139,11 @@ ushort read_tables()
         read_huff_table();
         next = 1;
     }
+    else if (temp == DRI)
+    {
+        read_restart_interval();
+        next = 1;
+    }
     if (next)
         temp = read_tables();
     return temp;
@@ -112,7 +157,7 @@ void read_frame_header()
     y = get_word();
     x = get_word();
     nf = get_byte();
-    comps = calloc(nf, sizeof(component));
+    comps = calloc(nf, sizeof(component*));
     printf("sample_pricision: %d\n", sample_precision);
     printf("x: %d\n", x);
     printf("y: %d\n", y);
@@ -128,10 +173,33 @@ void read_frame_header()
     }
 }
 
+//Чтение заголовка скана
+void read_scan_header()
+{
+    printf("SOS\n");
+    ushort ls = get_word();
+    uchar ns = get_byte();
+    for (int i = 0; i < ns; ++i)
+    {
+        uchar cs = get_byte();
+        bit4 tdta = get_4bit();
+        comps[cs - 1]->dc_table = tdta.first;
+        comps[cs - 1]->ac_table = tdta.second;
+        printf("component %d:\tDC: %d\tAC: %d\n", cs, tdta.first, tdta.second);
+    }
+    start_spectral = get_byte();
+    printf("start-spectral-selection: %d\n", start_spectral);
+    end_spectral = get_byte();
+    printf("end-spectral-selection: %d\n", end_spectral);
+    ahal = get_4bit();
+    printf("approximation-high: %d\tapproximation-low: %d\n\n", ahal.first, ahal.second);
+}
+
 //Чтение сегмента скана
 void read_scan()
 {
     ushort marker = read_tables();
+    read_scan_header();
 }
 
 //Чтение кадра
@@ -156,6 +224,7 @@ void read_jpeg(char *source)
         return;
     printf("SOI\n");
     read_frame();
+    printf("allGood\n");
     if (!read_marker(EOI)) //Проверка конца файла
         return;
 }

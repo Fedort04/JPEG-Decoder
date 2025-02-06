@@ -34,3 +34,28 @@ component *make_component(ushort h, ushort v, ushort tq)
     res->tq = tq;
     return res;
 }
+
+//Конструктор структуры таблицы Хаффмана
+huff_table *make_huff_table(uchar *offset, uchar *symbol, uint *codes)
+{
+    huff_table *res = malloc(sizeof(huff_table));
+    res->offset = offset;
+    res->symbols = symbol;
+    res->codes = codes;
+    return res;
+}
+
+//Конструирование кодов для таблицы huff
+void get_huff_table(huff_table *huff)
+{
+    uint code = 0;
+    for (int i = 0; i < 16; ++i)
+    {
+        for (int j = huff->offset[i]; j < huff->offset[i + 1]; ++j)
+        {
+            huff->codes[j] = code;
+            code += 1;
+        }
+        code = code << 1;
+    }
+}

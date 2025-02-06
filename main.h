@@ -5,6 +5,7 @@
 
 typedef unsigned short ushort;
 typedef unsigned char uchar;
+typedef unsigned int uint;
 
 const ushort SOI = 0xFFD8; //Начало изображения
 const ushort EOI = 0xFFD9; //Конец изображения
