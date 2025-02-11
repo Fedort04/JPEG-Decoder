@@ -108,6 +108,7 @@ void read_huff_table()
     }
     printf("DHT\n");
     printf("%cC-table %d\n\n", sym, tcth.second);
+    print_huff_table(temp);
 }
 
 //Чтение сегмента с перезапуском
@@ -202,58 +203,62 @@ short **decode_mcu()
     uchar num_of_Y = comps[0]->h * comps[0]->v;
     uchar num_of_Cb = comps[1]->h * comps[1]->v;
     uchar num_of_Cr = comps[2]->h * comps[2]->v;
-    short **data[num_of_Y + num_of_Cb + num_of_Cr];
+    printf("num_of_Y = %d\n", num_of_Y);
+    printf("num_of_Cb = %d\n", num_of_Cb);
+    printf("num_of_Cr = %d\n", num_of_Cr);
+    short **data = calloc(num_of_Y + num_of_Cb + num_of_Cr, sizeof(short*));
     for (int i = 0; i < num_of_Y; ++i)
-        data[i] = decode_data_unit(0, comps[0]->dc_table, comps[0]->ac_table, quant_tables[0]);
-    data[4] = decode_data_unit(1, comps[1]->dc_table, comps[1]->ac_table, quant_tables[1]);
-    data[5] = decode_data_unit(2, comps[2]->dc_table, comps[2]->ac_table, quant_tables[2]);
+        data[i] = decode_data_unit(0, DC_tables[comps[0]->dc_table], AC_tables[comps[0]->ac_table], quant_tables[0]);
+    data[4] = decode_data_unit(1, DC_tables[comps[1]->dc_table], AC_tables[comps[1]->ac_table], quant_tables[1]);
+    data[5] = decode_data_unit(2, DC_tables[comps[2]->dc_table], AC_tables[comps[2]->ac_table], quant_tables[2]);
     return data;
 }
 
 //Чтение сегмента скана
-void read_scan(pixel ***im)
+void read_scan(pixel **im)
 {
     ushort marker = read_tables();
     read_scan_header();
+    printf("scan_header -> complete\n");
     //Example-----
     data_unit_init(3);
     short **mcu = decode_mcu();
     for (int i = 0; i < 8; ++i)
         for (int j = 0; j < 8; ++j)
             {
-                im[i][j]->YCbCr.Y = mcu[0][i * 8 + j];
-                im[i][j]->YCbCr.Cb = mcu[4][(i / 2) * 8 + (j / 2)];
-                im[i][j]->YCbCr.Cr = mcu[5][(i / 2) * 8 + (j / 2)];
+                im[i * 16 + j]->YCbCr.Y = mcu[0][i * 8 + j];
+                im[i * 16 + j]->YCbCr.Cb = mcu[4][(i / 2) * 8 + (j / 2)];
+                im[i * 16 + j]->YCbCr.Cr = mcu[5][(i / 2) * 8 + (j / 2)];
             }
     for (int i = 8; i < 16; ++i)
         for (int j = 0; j < 8; ++j)
             {
-                im[i][j]->YCbCr.Y = mcu[1][i * 8 + j];
-                im[i][j]->YCbCr.Cb = mcu[4][(i / 2) * 8 + (j / 2)];
-                im[i][j]->YCbCr.Cr = mcu[5][(i / 2) * 8 + (j / 2)];
+                im[i * 16 + j]->YCbCr.Y = mcu[1][i * 8 + j];
+                im[i * 16 + j]->YCbCr.Cb = mcu[4][(i / 2) * 8 + (j / 2)];
+                im[i * 16 + j]->YCbCr.Cr = mcu[5][(i / 2) * 8 + (j / 2)];
             }
     for (int i = 0; i < 8; ++i)
         for (int j = 8; j < 16; ++j)
             {
-                im[i][j]->YCbCr.Y = mcu[2][i * 8 + j];
-                im[i][j]->YCbCr.Cb = mcu[4][(i / 2) * 8 + (j / 2)];
-                im[i][j]->YCbCr.Cr = mcu[5][(i / 2) * 8 + (j / 2)];
+                im[i * 16 + j]->YCbCr.Y = mcu[2][i * 8 + j];
+                im[i * 16 + j]->YCbCr.Cb = mcu[4][(i / 2) * 8 + (j / 2)];
+                im[i * 16 + j]->YCbCr.Cr = mcu[5][(i / 2) * 8 + (j / 2)];
             }
     for (int i = 8; i < 16; ++i)
         for (int j = 8; j < 16; ++j)
             {
-                im[i][j]->YCbCr.Y = mcu[3][i * 8 + j];
-                im[i][j]->YCbCr.Cb = mcu[4][(i / 2) * 8 + (j / 2)];
-                im[i][j]->YCbCr.Cr = mcu[5][(i / 2) * 8 + (j / 2)];
+                im[i * 16 + j]->YCbCr.Y = mcu[3][i * 8 + j];
+                im[i * 16 + j]->YCbCr.Cb = mcu[4][(i / 2) * 8 + (j / 2)];
+                im[i * 16 + j]->YCbCr.Cr = mcu[5][(i / 2) * 8 + (j / 2)];
             }
     for (int i = 0; i < 16; ++i)
         for (int j= 0; j < 16; ++j)
             {
-                pixel *prev = im[i][j];
+                pixel *prev = im[i * 16 + j];
                 prev->YCbCr.Y += 128;
                 prev->YCbCr.Cb += 128;
                 prev->YCbCr.Cr += 128;
-                im[i][j] = make_pixel(prev->YCbCr.Y + 1.402 * (prev->YCbCr.Cr - 128),
+                im[i * 16 + j] = make_pixel(prev->YCbCr.Y + 1.402 * (prev->YCbCr.Cr - 128),
                                     prev->YCbCr.Y - 0.34414 * (prev->YCbCr.Cb - 128) - 0.71414 * (prev->YCbCr.Cr - 128),
                                     prev->YCbCr.Y + 1.772 * (prev->YCbCr.Cb - 128));
                 free(prev);
@@ -261,10 +266,11 @@ void read_scan(pixel ***im)
 }
 
 //Кодирование в .bmp
-void encode_bmp(const pixel ***im)
+void encode_bmp(pixel **im)
 {
-       
-}
+    char *name = "Aqours.bmp";
+    FILE *src = fopen(name, "wb");
+} 
 
 //Чтение кадра
 void read_frame()
@@ -276,10 +282,11 @@ void read_frame()
         return;
     }
     read_frame_header();
-    pixel *image[16][16];
+    uchar s = 16;//размер изображения для теста
+    pixel **image = calloc(s * s, sizeof(pixel*));
     for (int i = 0; i < 16; ++i)
         for (int j = 0; j < 16; ++j)
-            image[i][j] = make_pixel(0, 0, 0);
+            image[i * s + j] = make_pixel(0, 0, 0);
     read_scan(image);
     encode_bmp(image);
 }

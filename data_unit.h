@@ -8,6 +8,8 @@
 typedef unsigned short ushort;
 typedef unsigned char uchar;
 
+#ifndef _PIXEL_
+#define _PIXEL_
 typedef struct pixel_s{
     union {
         struct {
@@ -22,9 +24,12 @@ typedef struct pixel_s{
         } YCbCr;
     };
 } pixel;
+#endif
 
+#ifndef _DATA_UNIT_H_
+#define _DATA_UNIT_H_
 //Последовательность зиг-зага
-const uchar ZIGZAG[64] = {
+const static uchar ZIGZAG[64] = {
      0,  1,  5,  6, 14, 15, 27, 28,
      2,  4,  7, 13, 16, 26, 29, 42,
      3,  8, 12, 17, 25, 30, 41, 43,
@@ -36,21 +41,22 @@ const uchar ZIGZAG[64] = {
 };
 
 //Константы для ОДКП
-const float m0 = 2.0 * cos(1.0 / 16.0 * 2.0 * M_PI);
-const float m1 = 2.0 * cos(2.0 / 16.0 * 2.0 * M_PI);
-const float m3 = 2.0 * cos(2.0 / 16.0 * 2.0 * M_PI);
-const float m5 = 2.0 * cos(3.0 / 16.0 * 2.0 * M_PI);
-const float m2 = m0 - m5;
-const float m4 = m0 + m5;
+const static float m0 = 2.0 * cos(1.0 / 16.0 * 2.0 * M_PI);
+static const float m1 = 2.0 * cos(2.0 / 16.0 * 2.0 * M_PI);
+static const float m3 = 2.0 * cos(2.0 / 16.0 * 2.0 * M_PI);
+static const float m5 = 2.0 * cos(3.0 / 16.0 * 2.0 * M_PI);
+static const float m2 = m0 - m5;
+static const float m4 = m0 + m5;
 
-const float s0 = cos(0.0 / 16.0 * M_PI) / sqrt(8);
-const float s1 = cos(1.0 / 16.0 * M_PI) / 2.0;
-const float s2 = cos(2.0 / 16.0 * M_PI) / 2.0;
-const float s3 = cos(3.0 / 16.0 * M_PI) / 2.0;
-const float s4 = cos(4.0 / 16.0 * M_PI) / 2.0;
-const float s5 = cos(5.0 / 16.0 * M_PI) / 2.0;
-const float s6 = cos(6.0 / 16.0 * M_PI) / 2.0;
-const float s7 = cos(7.0 / 16.0 * M_PI) / 2.0;
+static const float s0 = cos(0.0 / 16.0 * M_PI) / sqrt(8);
+static const float s1 = cos(1.0 / 16.0 * M_PI) / 2.0;
+static const float s2 = cos(2.0 / 16.0 * M_PI) / 2.0;
+static const float s3 = cos(3.0 / 16.0 * M_PI) / 2.0;
+static const float s4 = cos(4.0 / 16.0 * M_PI) / 2.0;
+static const float s5 = cos(5.0 / 16.0 * M_PI) / 2.0;
+static const float s6 = cos(6.0 / 16.0 * M_PI) / 2.0;
+static const float s7 = cos(7.0 / 16.0 * M_PI) / 2.0;
+#endif
 
 void data_unit_init(uchar num_of_elem);
 short *decode_data_unit(uchar elem_id, huff_table *dc, huff_table *ac, ushort *quant_table);

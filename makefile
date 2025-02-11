@@ -14,3 +14,7 @@ bin-read-test: binReader.o assert.o binReaderTest.c
 jpeg: binReader.o background.o main.c
 	gcc -o main binReader.o background.o main.c
 	./main
+
+all: binReader.c background.c data_unit.c binWriter.c main.c
+	gcc -o main binReader.c background.c data_unit.c binWriter.c main.c
+	./main

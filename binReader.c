@@ -75,13 +75,16 @@ bit4 get_4bit()
 //Возвращает очередной бит
 ushort get_bit()
 {
+    //printf("cur_byte: %x\n", cur_byte);
     if (cur_endianness == 'b') {
         if (bit_count == 0) {
             cur_byte = get_byte();
             bit_count = 8;
         }
-        if (cur_byte == 0xFF)
-            get_byte();
+        if (cur_byte == 0x00)
+        {
+            cur_byte = get_byte();
+        }
         ushort temp = cur_byte >> --bit_count;
         return temp & 1;
     }
@@ -90,11 +93,14 @@ ushort get_bit()
             cur_byte = get_byte();
             bit_count = -1;
         }
-        if (cur_byte == 0xFF)
-            get_byte();
+        if (cur_byte == 0x00)
+        {
+            cur_byte = get_byte();
+        }
         ushort temp = cur_byte >> ++bit_count;
         return temp & 1;
     }
+    printf("get_bit -> Error");
     return -1;
 }
 

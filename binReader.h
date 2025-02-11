@@ -1,7 +1,10 @@
+#ifndef _BIT4_
+#define _BIT4_
 typedef struct bit4_s{
     unsigned char first;
     unsigned char second;
 } bit4;
+#endif
 
 typedef unsigned short ushort;
 

@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include "data_unit.h"
 
 short *prev;
@@ -9,12 +10,13 @@ void data_unit_init(uchar num_of_elem)
     prev = calloc(num_of_elem, sizeof(short));
     for (int i = 0; i < num_of_elem; ++i)
         prev[i] = 0;
+    printf("data_unit_init -> complete\n");
 }
 
 //Декодирование знака в потоке Хаффмана
 short decode_sign(ushort num, short len)
 {
-    return num > (1 << len - 1) ? num : num - (1 << len) + 1;
+    return num >= (1 << len - 1) ? num : num - (1 << len) + 1;
 }
 
 //Декодирование из битового потока значений Хаффмана
@@ -36,7 +38,7 @@ uchar decode_huff(huff_table *huff)
         counter++;
     }
     printf("decode_huff -> Error: code has not been found");
-    return NULL;
+    return (uchar)code;
 }
 
 //Декодирование DC-коэффициента
@@ -58,6 +60,7 @@ void decode_ac(short *unit, huff_table *huff)
         uchar rs = decode_huff(huff);
         uchar big = rs >> 4;
         uchar small = rs & 0x0f;
+        printf("%d: %d\n", k, big);
         if (small == 0)
             if (big != 15)
                 return;
@@ -72,7 +75,9 @@ void decode_ac(short *unit, huff_table *huff)
             printf("decode_ac -> Error: k bigger than unit length");
             return;
         }
-        unit[k] = decode_sign(get_bits(small), small);
+        ushort bits = get_bits(small);
+        //printf("%d: %d -> %x\n", k, small, bits);
+        unit[k] = decode_sign(bits, small);
         k++;
     }
 }
@@ -239,14 +244,18 @@ void inverse_cosin(short *unit)
 //Декодирование одного блока 64
 short *decode_data_unit(uchar elem_id, huff_table *dc, huff_table *ac, ushort *quant_table)
 {
+    printf("decode_data_unit\n");
     short *unit = calloc(UNIT_LEN, sizeof(short));
     for (int i = 0; i < UNIT_LEN; ++i)
         unit[i] = 0;
     unit[0] = decode_dc(elem_id, dc);
     decode_ac(unit, ac);
-    dequant(unit, quant_table);
     unit = zig_zag_order(unit);
+    print_data_unit(unit);
+    dequant(unit, quant_table);
+    //unit = zig_zag_order(unit);
     inverse_cosin(unit);
+    //print_data_unit(unit);
     return unit;
 }
 
@@ -258,4 +267,16 @@ pixel *make_pixel(uchar r, uchar g, uchar b)
     res->RGB.G = g;
     res->RGB.B = b;
     return res;
+}
+
+//Вывод data_unit
+void print_data_unit(short *unit)
+{
+    for (int i = 0; i < ROW_COUNT; ++i)
+    {
+        for (int j = 0; j < ROW_COUNT; ++j)
+            printf("%d\t", unit[i * 8 + j]);
+        printf("\n");
+    }
+    printf("\n\n");
 }

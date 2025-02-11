@@ -59,3 +59,17 @@ void get_huff_table(huff_table *huff)
         code = code << 1;
     }
 }
+
+//Вывод таблицы Хаффмана
+void print_huff_table(huff_table *huff)
+{
+    for (int i = 0; i < 16; ++i)
+    {
+        printf("%d: ", i + 1);
+        for (int j = huff->offset[i]; j < huff->offset[i + 1]; ++j)
+        {
+            printf("%x ", huff->symbols[j]);
+        }
+        printf("\n");
+    }
+}
