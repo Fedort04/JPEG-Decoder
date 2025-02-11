@@ -60,7 +60,6 @@ void decode_ac(short *unit, huff_table *huff)
         uchar rs = decode_huff(huff);
         uchar big = rs >> 4;
         uchar small = rs & 0x0f;
-        printf("%d: %d\n", k, big);
         if (small == 0)
             if (big != 15)
                 return;
@@ -86,7 +85,7 @@ void decode_ac(short *unit, huff_table *huff)
 void dequant(short *unit, ushort *table)
 {
     for (int i = 0; i < UNIT_LEN; ++i)
-        unit[i] *= table[i];
+        unit[i] = unit[i] * table[i];
 }
 
 //Восстановление данных по зиг-загу 
@@ -250,10 +249,11 @@ short *decode_data_unit(uchar elem_id, huff_table *dc, huff_table *ac, ushort *q
         unit[i] = 0;
     unit[0] = decode_dc(elem_id, dc);
     decode_ac(unit, ac);
+    //unit = zig_zag_order(unit);
+    //print_data_unit(unit);
+    dequant(unit, quant_table);
     unit = zig_zag_order(unit);
     print_data_unit(unit);
-    dequant(unit, quant_table);
-    //unit = zig_zag_order(unit);
     inverse_cosin(unit);
     //print_data_unit(unit);
     return unit;
@@ -275,7 +275,7 @@ void print_data_unit(short *unit)
     for (int i = 0; i < ROW_COUNT; ++i)
     {
         for (int j = 0; j < ROW_COUNT; ++j)
-            printf("%d\t", unit[i * 8 + j]);
+            printf("%d\t", (short)unit[i * 8 + j]);
         printf("\n");
     }
     printf("\n\n");

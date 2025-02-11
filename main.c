@@ -210,7 +210,7 @@ short **decode_mcu()
     for (int i = 0; i < num_of_Y; ++i)
         data[i] = decode_data_unit(0, DC_tables[comps[0]->dc_table], AC_tables[comps[0]->ac_table], quant_tables[0]);
     data[4] = decode_data_unit(1, DC_tables[comps[1]->dc_table], AC_tables[comps[1]->ac_table], quant_tables[1]);
-    data[5] = decode_data_unit(2, DC_tables[comps[2]->dc_table], AC_tables[comps[2]->ac_table], quant_tables[2]);
+    data[5] = decode_data_unit(2, DC_tables[comps[2]->dc_table], AC_tables[comps[2]->ac_table], quant_tables[1]);
     return data;
 }
 
