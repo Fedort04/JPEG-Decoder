@@ -16,5 +16,5 @@ jpeg: binReader.o background.o main.c
 	./main
 
 all: binReader.c background.c data_unit.c binWriter.c main.c
-	gcc -o bin/main binReader.c background.c data_unit.c binWriter.c main.c
+	gcc -o bin/main binReader.c background.c data_unit.c binWriter.c main.c -lm
 	./bin/main

@@ -4,6 +4,7 @@
 #include "background.h"
 #include "main.h"
 #include "data_unit.h"
+#include "binWriter.h"
 
 ushort *quant_tables[NUM_OF_TABLES]; //Массив таблиц квантования
 huff_table *DC_tables[NUM_OF_TABLES]; //Массив таблиц Хаффмана для DC
@@ -214,6 +215,11 @@ short **decode_mcu()
     return data;
 }
 
+//Проверка в диапазоне 0-255
+static inline uchar clamp(int n) {
+    return n < 0 ? 0 : n > 255 ? 255 : n;
+}
+
 //Чтение сегмента скана
 void read_scan(pixel **im)
 {
@@ -226,31 +232,47 @@ void read_scan(pixel **im)
     for (int i = 0; i < 8; ++i)
         for (int j = 0; j < 8; ++j)
             {
-                im[i * 16 + j]->YCbCr.Y = mcu[0][i * 8 + j];
-                im[i * 16 + j]->YCbCr.Cb = mcu[4][(i / 2) * 8 + (j / 2)];
-                im[i * 16 + j]->YCbCr.Cr = mcu[5][(i / 2) * 8 + (j / 2)];
-            }
-    for (int i = 8; i < 16; ++i)
-        for (int j = 0; j < 8; ++j)
-            {
-                im[i * 16 + j]->YCbCr.Y = mcu[1][i * 8 + j];
-                im[i * 16 + j]->YCbCr.Cb = mcu[4][(i / 2) * 8 + (j / 2)];
-                im[i * 16 + j]->YCbCr.Cr = mcu[5][(i / 2) * 8 + (j / 2)];
+                int i_mcu = i % 8;
+                int j_mcu = j % 8;
+                im[i * 16 + j]->YCbCr.Y = mcu[0][i_mcu * 8 + j_mcu];
+                im[i * 16 + j]->YCbCr.Cb = mcu[4][(i_mcu / 2) * 8 + (j_mcu / 2)];
+                im[i * 16 + j]->YCbCr.Cr = mcu[5][(i_mcu / 2) * 8 + (j_mcu / 2)];
             }
     for (int i = 0; i < 8; ++i)
         for (int j = 8; j < 16; ++j)
             {
-                im[i * 16 + j]->YCbCr.Y = mcu[2][i * 8 + j];
-                im[i * 16 + j]->YCbCr.Cb = mcu[4][(i / 2) * 8 + (j / 2)];
-                im[i * 16 + j]->YCbCr.Cr = mcu[5][(i / 2) * 8 + (j / 2)];
+                int i_mcu = i % 8;
+                int j_mcu = j % 8;
+                im[i * 16 + j]->YCbCr.Y = mcu[1][i_mcu * 8 + j_mcu];
+                im[i * 16 + j]->YCbCr.Cb = mcu[4][(i_mcu / 2) * 8 + (j_mcu / 2)];
+                im[i * 16 + j]->YCbCr.Cr = mcu[5][(i_mcu / 2) * 8 + (j_mcu / 2)];
+            }
+    for (int i = 8; i < 16; ++i)
+        for (int j = 0; j < 8; ++j)
+            {
+                int i_mcu = i % 8;
+                int j_mcu = j % 8;
+                im[i * 16 + j]->YCbCr.Y = mcu[2][i_mcu * 8 + j_mcu];
+                im[i * 16 + j]->YCbCr.Cb = mcu[4][(i_mcu / 2) * 8 + (j_mcu / 2)];
+                im[i * 16 + j]->YCbCr.Cr = mcu[5][(i_mcu / 2) * 8 + (j_mcu / 2)];
             }
     for (int i = 8; i < 16; ++i)
         for (int j = 8; j < 16; ++j)
             {
-                im[i * 16 + j]->YCbCr.Y = mcu[3][i * 8 + j];
-                im[i * 16 + j]->YCbCr.Cb = mcu[4][(i / 2) * 8 + (j / 2)];
-                im[i * 16 + j]->YCbCr.Cr = mcu[5][(i / 2) * 8 + (j / 2)];
+                int i_mcu = i % 8;
+                int j_mcu = j % 8;
+                im[i * 16 + j]->YCbCr.Y = mcu[3][i_mcu * 8 + j_mcu];
+                im[i * 16 + j]->YCbCr.Cb = mcu[4][(i_mcu / 2) * 8 + (j_mcu / 2)];
+                im[i * 16 + j]->YCbCr.Cr = mcu[5][(i_mcu / 2) * 8 + (j_mcu / 2)];
             }
+    /*for (int i = 0; i < 16; ++i)
+        for (int j= 0; j < 16; ++j)
+        {
+            printf("%d ", im[i * 16 + j]->YCbCr.Y);
+                if (j == 15)
+                    printf("\n");
+        }
+    printf("\n");*/
     for (int i = 0; i < 16; ++i)
         for (int j= 0; j < 16; ++j)
             {
@@ -258,10 +280,13 @@ void read_scan(pixel **im)
                 prev->YCbCr.Y += 128;
                 prev->YCbCr.Cb += 128;
                 prev->YCbCr.Cr += 128;
-                im[i * 16 + j] = make_pixel(prev->YCbCr.Y + 1.402 * (prev->YCbCr.Cr - 128),
-                                    prev->YCbCr.Y - 0.34414 * (prev->YCbCr.Cb - 128) - 0.71414 * (prev->YCbCr.Cr - 128),
-                                    prev->YCbCr.Y + 1.772 * (prev->YCbCr.Cb - 128));
+                im[i * 16 + j] = make_pixel(clamp(prev->YCbCr.Y + 1.402 * (prev->YCbCr.Cr - 128)),
+                                    clamp(prev->YCbCr.Y - 0.34414 * (prev->YCbCr.Cb - 128) - 0.71414 * (prev->YCbCr.Cr - 128)),
+                                    clamp(prev->YCbCr.Y + 1.772 * (prev->YCbCr.Cb - 128)));
                 free(prev);
+                printf("x%x%x%x ", im[i * 16 + j]->RGB.R, im[i * 16 + j]->RGB.G, im[i * 16 + j]->RGB.B);
+                if (j == 15)
+                    printf("\n");
             }
 }
 
@@ -269,7 +294,33 @@ void read_scan(pixel **im)
 void encode_bmp(pixel **im)
 {
     char *name = "Aqours.bmp";
-    FILE *src = fopen(name, "wb");
+    set_bin_output(name);
+    uchar image_size = 16;//temporary
+    uint padding_size = image_size % 4;
+    uint size = 14 + 12 + image_size * image_size * 3 + padding_size * image_size;
+    put_char('B');
+    put_char('M');
+    put_int(size);
+    put_int(0);
+    put_int(0x1A);
+    put_int(12);
+    put_short(image_size);
+    put_short(image_size);
+    put_short(1);
+    put_short(24);
+
+    for (int i = image_size - 1; i >= 0; --i)
+    {
+        for (int j = 0; j < image_size; ++j)
+        {
+            put_char(im[i * image_size + j]->RGB.B);
+            put_char(im[i * image_size + j]->RGB.G);
+            put_char(im[i * image_size + j]->RGB.R);
+        }
+        for (int j = 0; j < padding_size; ++j)
+            put_char(0);
+    }
+    close_bin_output();
 } 
 
 //Чтение кадра

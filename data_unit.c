@@ -2,7 +2,26 @@
 #include <stdio.h>
 #include "data_unit.h"
 
+//Предыдущие значения для DC
 short *prev;
+//Флаг для инициализации таблицы idct
+uchar table_init = 0;
+//Таблица idct
+float *idct_map;
+
+//мб удалить
+//Вычисление значений для таблицы
+void idct_init()
+{
+    printf("idct_init -> call\n");
+    idct_map = calloc(UNIT_LEN, sizeof(float));
+    for (int u = 0; u < ROW_COUNT; ++u)
+    {
+        float c = (u == 0) ? (1.0 / sqrt(2.0) / 2.0) : (1.0 / 2.0);
+        for (int x = 0; x < ROW_COUNT; ++x)
+            idct_map[u * 8 + x] = c * cos((2.0 * x + 1.0) * u * 3.14f / 16.0);
+    }
+}
 
 //Инициализация декодирования потока, предыдущие значения
 void data_unit_init(uchar num_of_elem)
@@ -17,6 +36,12 @@ void data_unit_init(uchar num_of_elem)
 short decode_sign(ushort num, short len)
 {
     return num >= (1 << len - 1) ? num : num - (1 << len) + 1;
+}
+
+//мб удалить
+//Проверка в диапазоне 0-255
+static inline uchar clamp(int n) {
+    return n < 0 ? 0 : n > 255 ? 255 : n;
 }
 
 //Декодирование из битового потока значений Хаффмана
@@ -240,6 +265,42 @@ void inverse_cosin(short *unit)
     }
 }
 
+
+//Другой метод
+void inverse_cosin_new(short *unit)
+{
+    short *res = calloc(UNIT_LEN, sizeof(short));
+    if (!table_init)
+    {
+        idct_init();
+        table_init = 1;
+    }
+    for (int x = 0; x < ROW_COUNT; ++x)
+        for (int y = 0; y < ROW_COUNT; ++y)
+        {
+            double sum = 0.0;
+            for (int u = 0; u < ROW_COUNT; ++u)
+                for (int v = 0; v < ROW_COUNT; ++v)
+                    sum += unit[v * 8 + u] * IDCT_TABLE[u * 8 + x] * IDCT_TABLE[v * 8 + y];
+            res[x * 8 + y] = (short)(sum * 0.25);
+        }
+    for (int i = 0; i < UNIT_LEN; ++i)
+        unit[i] = res[i];
+    free(res);
+}
+
+//Вывод data_unit
+void print_data_unit(short *unit)
+{
+    for (int i = 0; i < ROW_COUNT; ++i)
+    {
+        for (int j = 0; j < ROW_COUNT; ++j)
+            printf("%d\t", (short)unit[i * 8 + j]);
+        printf("\n");
+    }
+    printf("\n\n");
+}
+
 //Декодирование одного блока 64
 short *decode_data_unit(uchar elem_id, huff_table *dc, huff_table *ac, ushort *quant_table)
 {
@@ -253,9 +314,9 @@ short *decode_data_unit(uchar elem_id, huff_table *dc, huff_table *ac, ushort *q
     //print_data_unit(unit);
     dequant(unit, quant_table);
     unit = zig_zag_order(unit);
-    print_data_unit(unit);
-    inverse_cosin(unit);
     //print_data_unit(unit);
+    inverse_cosin_new(unit);
+    print_data_unit(unit);
     return unit;
 }
 
@@ -267,16 +328,4 @@ pixel *make_pixel(uchar r, uchar g, uchar b)
     res->RGB.G = g;
     res->RGB.B = b;
     return res;
-}
-
-//Вывод data_unit
-void print_data_unit(short *unit)
-{
-    for (int i = 0; i < ROW_COUNT; ++i)
-    {
-        for (int j = 0; j < ROW_COUNT; ++j)
-            printf("%d\t", (short)unit[i * 8 + j]);
-        printf("\n");
-    }
-    printf("\n\n");
 }
