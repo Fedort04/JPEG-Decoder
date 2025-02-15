@@ -270,11 +270,11 @@ void inverse_cosin(short *unit)
 void inverse_cosin_new(short *unit)
 {
     short *res = calloc(UNIT_LEN, sizeof(short));
-    if (!table_init)
+    /*if (!table_init)
     {
         idct_init();
         table_init = 1;
-    }
+    }*/
     for (int x = 0; x < ROW_COUNT; ++x)
         for (int y = 0; y < ROW_COUNT; ++y)
         {

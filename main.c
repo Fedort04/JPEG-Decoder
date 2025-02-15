@@ -12,8 +12,14 @@ huff_table *AC_tables[NUM_OF_TABLES]; //Массив таблиц Хаффман
 ushort sample_precision; //precision of bits
 ushort x; //Ширина
 ushort y; //Высота
-ushort nf; //Кол-во компонент
+uchar max_h; //Максимальное значение горизонтального прореживания
+uchar max_v; //Максимальное значения вертикального прореживания
+uchar mcu_height; //Высота MCU
+uchar mcu_width; //Ширина MCU
+ushort num_of_comps; //Кол-во компонент
 component **comps; //Массив ссылок на данные о компонентах
+uchar *data_unit_by_comp;//Количество блоков для каждой компоненты
+uchar sum_units;//Количество блоков в каждом MCU
 ushort restart_interval = 0; //Перезапуск MCU, по умолчанию 0
 ushort start_spectral = 0; //Для прогрессивного
 ushort end_spectral = 63; //Для прогрессивного
@@ -159,21 +165,35 @@ void read_frame_header()
     sample_precision = get_byte();
     y = get_word();
     x = get_word();
-    nf = get_byte();
-    comps = calloc(nf, sizeof(component*));
+    num_of_comps = get_byte();
+    comps = calloc(num_of_comps, sizeof(component*));
     printf("sample_pricision: %d\n", sample_precision);
     printf("x: %d\n", x);
     printf("y: %d\n", y);
-    printf("num of components: %d\n", nf);
-    for (int i = 0; i < nf; ++i)
+    printf("num of components: %d\n", num_of_comps);
+    for (int i = 0; i < num_of_comps; ++i)
     {
         ushort c = get_byte();
         bit4 hv = get_4bit();
+        if (hv.first > max_h)
+            max_h = hv.first;
+        if (hv.second > max_v)
+            max_v = hv.second;
         ushort tq = get_byte();
         comps[c - 1] = make_component(hv.first, hv.second, tq);
         printf("component %d\n", c);
         print_component(comps[c - 1]);
     }
+    //Вычисление данных для декодирования MCU
+    data_unit_by_comp = calloc(num_of_comps, sizeof(uchar));
+    for (int i = 0; i < num_of_comps; ++i)
+    {
+        uchar temp = comps[i]->h * comps[i]->v;
+        data_unit_by_comp[i] = temp;
+        sum_units += temp;
+    }
+    mcu_height = ROW_COUNT * max_v;
+    mcu_width = ROW_COUNT * max_h;
 }
 
 //Чтение заголовка скана
@@ -186,8 +206,8 @@ void read_scan_header()
     {
         uchar cs = get_byte();
         bit4 tdta = get_4bit();
-        comps[cs - 1]->dc_table = tdta.first;
-        comps[cs - 1]->ac_table = tdta.second;
+        comps[cs - 1]->dc_table_id = tdta.first;
+        comps[cs - 1]->ac_table_id = tdta.second;
         printf("component %d:\tDC: %d\tAC: %d\n", cs, tdta.first, tdta.second);
     }
     start_spectral = get_byte();
@@ -198,21 +218,62 @@ void read_scan_header()
     printf("approximation-high: %d\tapproximation-low: %d\n\n", ahal.first, ahal.second);
 }
 
-//Декодирование одного MCU
-short **decode_mcu()
+//Декодирование одного MCU (только JFIF)
+pixel **decode_mcu()
 {
-    uchar num_of_Y = comps[0]->h * comps[0]->v;
-    uchar num_of_Cb = comps[1]->h * comps[1]->v;
-    uchar num_of_Cr = comps[2]->h * comps[2]->v;
-    printf("num_of_Y = %d\n", num_of_Y);
-    printf("num_of_Cb = %d\n", num_of_Cb);
-    printf("num_of_Cr = %d\n", num_of_Cr);
-    short **data = calloc(num_of_Y + num_of_Cb + num_of_Cr, sizeof(short*));
-    for (int i = 0; i < num_of_Y; ++i)
-        data[i] = decode_data_unit(0, DC_tables[comps[0]->dc_table], AC_tables[comps[0]->ac_table], quant_tables[0]);
-    data[4] = decode_data_unit(1, DC_tables[comps[1]->dc_table], AC_tables[comps[1]->ac_table], quant_tables[1]);
-    data[5] = decode_data_unit(2, DC_tables[comps[2]->dc_table], AC_tables[comps[2]->ac_table], quant_tables[1]);
-    return data;
+    printf("num_of_Y = %d\n", data_unit_by_comp[0]);
+    printf("num_of_Cb = %d\n", data_unit_by_comp[1]);
+    printf("num_of_Cr = %d\n", data_unit_by_comp[2]);
+    pixel **im = calloc(mcu_width * mcu_height, sizeof(pixel*));
+    for (int i = 0; i < mcu_width; ++i)
+        for (int j = 0; j < mcu_height; ++j)
+            im[i * mcu_width + j] = make_pixel(0, 0, 0);
+    for (int i = 0; i < num_of_comps; ++i)
+    {
+        uchar x_padding = 0;
+        uchar y_padding = 0;
+        for (int k = 0; k < data_unit_by_comp[i]; ++k)
+        {
+            printf("k: %d\n", k);
+            int scaling_x = (max_v / comps[i]->v);
+            int scaling_y = (max_h / comps[i]->h);
+            short *unit = decode_data_unit(i, DC_tables[comps[i]->dc_table_id], AC_tables[comps[i]->ac_table_id], quant_tables[comps[i]->tq]);
+            for (int x = x_padding; x < x_padding + ROW_COUNT * scaling_x; ++x)
+                for (int y = y_padding; y < y_padding + ROW_COUNT * scaling_y; ++y)
+                {
+                    int i_mcu = x % (ROW_COUNT * scaling_x);
+                    int j_mcu = y % (ROW_COUNT * scaling_y);
+                    if (i == 0)
+                        im[x * mcu_width + y]->YCbCr.Y = unit[(i_mcu / scaling_x) * ROW_COUNT + (j_mcu / scaling_y)];
+                    else if (i == 1)
+                        im[x * mcu_width + y]->YCbCr.Cb = unit[(i_mcu / scaling_x) * ROW_COUNT + (j_mcu / scaling_y)];
+                    else if (i == 2)
+                        im[x * mcu_width + y]->YCbCr.Cr = unit[(i_mcu / scaling_x) * ROW_COUNT + (j_mcu / scaling_y)];
+                }
+
+            free(unit);
+            if (comps[i]->h > 1 && y_padding == 0 && k != 3)
+            {
+                y_padding += ROW_COUNT;
+            }
+            else if (comps[i]->v > 1 && x_padding == 0 && k != 3)
+            {
+                y_padding = 0;
+                x_padding += ROW_COUNT;
+            }
+            else if (comps[i]->h == 2 && comps[i]->v == 2)
+            {
+                y_padding += ROW_COUNT;
+            }
+            else if (comps[i]->h != 1 && comps[i]->v != 1)
+            {
+                printf("k = %d\n", k);
+                printf("decode_mcu -> Error: incorrect (h . v) values for JFIF (%d . %d)\n", comps[i]->h, comps[i]->v);
+                return im;
+            }
+        }
+    }
+    return im;
 }
 
 //Проверка в диапазоне 0-255
@@ -227,52 +288,24 @@ void read_scan(pixel **im)
     read_scan_header();
     printf("scan_header -> complete\n");
     //Example-----
-    data_unit_init(3);
-    short **mcu = decode_mcu();
-    for (int i = 0; i < 8; ++i)
-        for (int j = 0; j < 8; ++j)
-            {
-                int i_mcu = i % 8;
-                int j_mcu = j % 8;
-                im[i * 16 + j]->YCbCr.Y = mcu[0][i_mcu * 8 + j_mcu];
-                im[i * 16 + j]->YCbCr.Cb = mcu[4][(i_mcu / 2) * 8 + (j_mcu / 2)];
-                im[i * 16 + j]->YCbCr.Cr = mcu[5][(i_mcu / 2) * 8 + (j_mcu / 2)];
-            }
-    for (int i = 0; i < 8; ++i)
-        for (int j = 8; j < 16; ++j)
-            {
-                int i_mcu = i % 8;
-                int j_mcu = j % 8;
-                im[i * 16 + j]->YCbCr.Y = mcu[1][i_mcu * 8 + j_mcu];
-                im[i * 16 + j]->YCbCr.Cb = mcu[4][(i_mcu / 2) * 8 + (j_mcu / 2)];
-                im[i * 16 + j]->YCbCr.Cr = mcu[5][(i_mcu / 2) * 8 + (j_mcu / 2)];
-            }
-    for (int i = 8; i < 16; ++i)
-        for (int j = 0; j < 8; ++j)
-            {
-                int i_mcu = i % 8;
-                int j_mcu = j % 8;
-                im[i * 16 + j]->YCbCr.Y = mcu[2][i_mcu * 8 + j_mcu];
-                im[i * 16 + j]->YCbCr.Cb = mcu[4][(i_mcu / 2) * 8 + (j_mcu / 2)];
-                im[i * 16 + j]->YCbCr.Cr = mcu[5][(i_mcu / 2) * 8 + (j_mcu / 2)];
-            }
-    for (int i = 8; i < 16; ++i)
-        for (int j = 8; j < 16; ++j)
-            {
-                int i_mcu = i % 8;
-                int j_mcu = j % 8;
-                im[i * 16 + j]->YCbCr.Y = mcu[3][i_mcu * 8 + j_mcu];
-                im[i * 16 + j]->YCbCr.Cb = mcu[4][(i_mcu / 2) * 8 + (j_mcu / 2)];
-                im[i * 16 + j]->YCbCr.Cr = mcu[5][(i_mcu / 2) * 8 + (j_mcu / 2)];
-            }
-    /*for (int i = 0; i < 16; ++i)
+    data_unit_init(num_of_comps);
+    ushort num_of_xmcu = 0; //Кол-во прочитанных mcu по x
+    ushort num_of_ymcu = 0; //Кол-во прочитанных mcu по y
+    pixel **mcu = decode_mcu();
+    for (int i = num_of_xmcu; i < mcu_height; ++i)
+        for (int j = num_of_ymcu; j < mcu_width; ++j)
+        {
+            im[i * mcu_height + j] = mcu[i * mcu_height + j];
+        }
+        free(mcu);
+    for (int i = 0; i < 16; ++i)
         for (int j= 0; j < 16; ++j)
         {
-            printf("%d ", im[i * 16 + j]->YCbCr.Y);
+            printf("%d ", im[i * 16 + j]->YCbCr.Cr);
                 if (j == 15)
                     printf("\n");
         }
-    printf("\n");*/
+    printf("\n");
     for (int i = 0; i < 16; ++i)
         for (int j= 0; j < 16; ++j)
             {

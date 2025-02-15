@@ -7,9 +7,9 @@ typedef unsigned int uint;
 typedef struct component_s{
     ushort h;
     ushort v;
-    ushort tq;
-    uchar dc_table;
-    uchar ac_table;
+    ushort tq;//Ид таблицы квантования для компоненты
+    uchar dc_table_id;
+    uchar ac_table_id;
 } component;
 #endif
 
