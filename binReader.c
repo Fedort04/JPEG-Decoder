@@ -45,6 +45,8 @@ ushort get_byte()
 //Возвращает следующий байт без изменения указателя
 ushort get_next_byte()
 {
+    printf("prev_byte:%x\n", prev_byte);
+    printf("cur_byte:%x\n", cur_byte);
     ushort ans = getc(read_src);
     fseek(read_src, -1, SEEK_CUR);
     return ans;
@@ -88,6 +90,7 @@ ushort get_bit()
         }
         if (prev_byte == 0xFF && cur_byte == 0x00)
         {
+            prev_byte = 0;
             cur_byte = get_byte();
         }
         ushort temp = cur_byte >> --bit_count;
@@ -101,6 +104,7 @@ ushort get_bit()
         }
         if (prev_byte == 0xFF && cur_byte == 0x00)
         {
+            prev_byte = 0;
             cur_byte = get_byte();
         }
         ushort temp = cur_byte >> ++bit_count;

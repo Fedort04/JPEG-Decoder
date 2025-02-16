@@ -25,7 +25,8 @@ ushort start_spectral = 0; //Для прогрессивного
 ushort end_spectral = 63; //Для прогрессивного
 bit4 ahal;
 
-uchar cur_image_width = 16 * 10;
+uchar const cur_restarts_num = 19;
+uint const cur_image_width = 16 * 5 * cur_restarts_num;
 
 //Чтение маркера marker
 //return 1, если маркер прочитан корректно
@@ -305,12 +306,13 @@ uchar make_restart()
 {
     ushort marker = get_word();
     bits_align();
-    printf("marker: %x\n", marker);
-    if (marker >= RST0 && marker < RST7)
+    //printf("marker: %x\n", marker);
+    if (marker >= RST0 && marker <= RST7)
     {
         data_unit_init(num_of_comps);
         return 1;
     }
+    printf("marker: %x\n", marker);
     return 0;
 }
 
@@ -324,11 +326,11 @@ void read_scan(pixel **im)
     data_unit_init(num_of_comps);
     ushort num_of_xmcu = 0; //Кол-во прочитанных mcu по x
     ushort num_of_ymcu = 0; //Кол-во прочитанных mcu по y
-    for (int c = 0; c < 2; ++c)
+    for (int c = 0; c < cur_restarts_num; ++c)
     {
         for (int k = 0; k < restart_interval; ++k)
     {
-        //printf("decode_mcu->%d\n", k);
+        printf("decode_mcu -> interval:%d  mcu%d\n", c, k);
         pixel **mcu = decode_mcu();
         for (int i = num_of_xmcu * mcu_height; i < mcu_height * (num_of_xmcu + 1); ++i)
             for (int j = num_of_ymcu * mcu_width; j < mcu_width * (num_of_ymcu + 1); ++j)
@@ -339,7 +341,7 @@ void read_scan(pixel **im)
             }
             free(mcu);
             ++num_of_ymcu;
-        //printf("\n");
+        //printf("next_byte: %x\n", get_next_byte());
     }
     if (!make_restart())
     {
@@ -354,10 +356,10 @@ void encode_bmp(pixel **im)
 {
     char *name = "Aqours.bmp";
     set_bin_output(name);
-    uchar height = 16;//temporary
-    uchar width = cur_image_width;
+    uint height = 16;//temporary
+    uint width = cur_image_width;
     uint padding_size = width % 4;
-    uint size = 14 + 12 + height * height * 3 + padding_size * height;
+    uint size = 14 + 12 + height * width * 3 + padding_size * height;
     put_char('B');
     put_char('M');
     put_int(size);
@@ -394,7 +396,7 @@ void read_frame()
     }
     read_frame_header();
     uchar s = 16;//размер изображения для теста
-    pixel **image = calloc(s * s, sizeof(pixel*));
+    pixel **image = calloc(s * cur_image_width, sizeof(pixel*));
     for (int i = 0; i < s; ++i)
         for (int j = 0; j < cur_image_width; ++j)
             image[i * cur_image_width + j] = make_pixel(0, 0, 0);
@@ -412,11 +414,12 @@ void read_jpeg(char *source)
     printf("SOI\n");
     read_frame();
     printf("allGood\n");
+    printf("ppupupu %d\n", cur_image_width);
     if (!read_marker(EOI)) //Проверка конца файла
         return;
 }
 
 int main(void)
 {
-    read_jpeg(NULL);
+    read_jpeg("Aqours.jpg");
 }

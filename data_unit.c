@@ -45,9 +45,9 @@ static inline uchar clamp(int n) {
 }
 
 //Декодирование из битового потока значений Хаффмана
-uchar decode_huff(huff_table *huff)
+uint decode_huff(huff_table *huff)
 {
-    ushort code = 0;
+    uint code = 0;
     ushort code_len = 0;
     int counter = 0;
     while (counter < 10000)
@@ -63,7 +63,7 @@ uchar decode_huff(huff_table *huff)
         counter++;
     }
     printf("decode_huff -> Error: code has not been found");
-    return (uchar)code;
+    return code;
 }
 
 //Декодирование DC-коэффициента
@@ -83,6 +83,12 @@ void decode_ac(short *unit, huff_table *huff)
     while (k < UNIT_LEN)
     {
         uchar rs = decode_huff(huff);
+        /*if (rs == 0x8a)
+            {
+                printf("next_byte:%x\n", get_next_byte());
+                printf("pupupu%d\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n", k);
+                //rs = 0xe1;
+            }*/
         uchar big = rs >> 4;
         uchar small = rs & 0x0f;
         if (small == 0)
@@ -96,12 +102,15 @@ void decode_ac(short *unit, huff_table *huff)
         k += big;
         if (k >= UNIT_LEN)
         {
-            printf("decode_ac -> Error: k bigger than unit length");
+            printf("decode_ac -> Error: k(%d) bigger than unit length\n", k);
+            printf("big:%d small:%d rs:%d\n", big, small, rs);
+            printf("next_byte:%x\n", get_next_byte());
             return;
         }
         ushort bits = get_bits(small);
         //printf("%d: %d -> %x\n", k, small, bits);
         unit[k] = decode_sign(bits, small);
+        //printf("k:%d, rs:%x\n", k, rs);
         k++;
     }
 }
@@ -314,6 +323,7 @@ short *decode_data_unit(uchar elem_id, huff_table *dc, huff_table *ac, ushort *q
     //print_data_unit(unit);
     dequant(unit, quant_table);
     unit = zig_zag_order(unit);
+    //printf("next_byte: %x\n", get_next_byte());
     //print_data_unit(unit);
     inverse_cosin(unit);
     //print_data_unit(unit);
