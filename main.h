@@ -7,16 +7,17 @@ typedef unsigned short ushort;
 typedef unsigned char uchar;
 typedef unsigned int uint;
 
-const ushort SOI = 0xFFD8; //Начало изображения
-const ushort EOI = 0xFFD9; //Конец изображения
-const ushort SOS = 0xFFDA; //Начало скана
-const ushort DQT = 0xFFDB; //Таблица квантования
-const ushort DRI = 0xFFDD; //Restart interval
-const ushort APP0 = 0xFFE0; //Сегменты приложений от 0xFFE0 до 0xFFEF
-const ushort APP15 = 0xFFEF;
-const ushort COM = 0xFFFE; //Комментарий
-const ushort SOF = 0xFFC0; //Начало основного кадра
-const ushort DHT = 0xFFC4; //Таблица Хаффмана
-const ushort RST = 0xFFD0; //Интервал перезапуска
+static const ushort SOI = 0xFFD8; //Начало изображения
+static const ushort EOI = 0xFFD9; //Конец изображения
+static const ushort SOS = 0xFFDA; //Начало скана
+static const ushort DQT = 0xFFDB; //Таблица квантования
+static const ushort DRI = 0xFFDD; //Restart interval
+static const ushort APP0 = 0xFFE0; //Сегменты приложений от 0xFFE0 до 0xFFEF
+static const ushort APP15 = 0xFFEF;
+static const ushort COM = 0xFFFE; //Комментарий
+static const ushort SOF = 0xFFC0; //Начало основного кадра
+static const ushort DHT = 0xFFC4; //Таблица Хаффмана
+static const ushort RST0 = 0xFFD0; //Интервал перезапуска от 0xFFD0 до 0xFFD7
+static const ushort RST7 = 0xFFD7;
 
 void read_jpeg(char *source);

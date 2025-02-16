@@ -10,8 +10,8 @@ ushort *quant_tables[NUM_OF_TABLES]; //Массив таблиц квантов�
 huff_table *DC_tables[NUM_OF_TABLES]; //Массив таблиц Хаффмана для DC
 huff_table *AC_tables[NUM_OF_TABLES]; //Массив таблиц Хаффмана для АС
 ushort sample_precision; //precision of bits
-ushort x; //Ширина
-ushort y; //Высота
+ushort image_width; //Ширина
+ushort image_height; //Высота
 uchar max_h; //Максимальное значение горизонтального прореживания
 uchar max_v; //Максимальное значения вертикального прореживания
 uchar mcu_height; //Высота MCU
@@ -24,6 +24,8 @@ ushort restart_interval = 0; //Перезапуск MCU, по умолчанию
 ushort start_spectral = 0; //Для прогрессивного
 ushort end_spectral = 63; //Для прогрессивного
 bit4 ahal;
+
+uchar cur_image_width = 16 * 10;
 
 //Чтение маркера marker
 //return 1, если маркер прочитан корректно
@@ -163,13 +165,13 @@ void read_frame_header()
 {
     ushort lf = get_word();
     sample_precision = get_byte();
-    y = get_word();
-    x = get_word();
+    image_height = get_word();
+    image_width = get_word();
     num_of_comps = get_byte();
     comps = calloc(num_of_comps, sizeof(component*));
     printf("sample_pricision: %d\n", sample_precision);
-    printf("x: %d\n", x);
-    printf("y: %d\n", y);
+    printf("image_width: %d\n", image_width);
+    printf("image_height: %d\n", image_height);
     printf("num of components: %d\n", num_of_comps);
     for (int i = 0; i < num_of_comps; ++i)
     {
@@ -218,12 +220,17 @@ void read_scan_header()
     printf("approximation-high: %d\tapproximation-low: %d\n\n", ahal.first, ahal.second);
 }
 
+//Проверка в диапазоне 0-255
+static inline uchar clamp(int n) {
+    return n < 0 ? 0 : n > 255 ? 255 : n;
+}
+
 //Декодирование одного MCU (только JFIF)
 pixel **decode_mcu()
 {
-    printf("num_of_Y = %d\n", data_unit_by_comp[0]);
+    /*printf("num_of_Y = %d\n", data_unit_by_comp[0]);
     printf("num_of_Cb = %d\n", data_unit_by_comp[1]);
-    printf("num_of_Cr = %d\n", data_unit_by_comp[2]);
+    printf("num_of_Cr = %d\n", data_unit_by_comp[2]);*/
     pixel **im = calloc(mcu_width * mcu_height, sizeof(pixel*));
     for (int i = 0; i < mcu_width; ++i)
         for (int j = 0; j < mcu_height; ++j)
@@ -234,7 +241,7 @@ pixel **decode_mcu()
         uchar y_padding = 0;
         for (int k = 0; k < data_unit_by_comp[i]; ++k)
         {
-            printf("k: %d\n", k);
+            //printf("k: %d\n", k);
             int scaling_x = (max_v / comps[i]->v);
             int scaling_y = (max_h / comps[i]->h);
             short *unit = decode_data_unit(i, DC_tables[comps[i]->dc_table_id], AC_tables[comps[i]->ac_table_id], quant_tables[comps[i]->tq]);
@@ -273,12 +280,38 @@ pixel **decode_mcu()
             }
         }
     }
+
+    //Перевод в RGB
+    for (int i = 0; i < mcu_height; ++i)
+    for (int j= 0; j < mcu_width; ++j)
+        {
+            pixel *prev = im[i * mcu_width + j];
+            prev->YCbCr.Y += 128;
+            prev->YCbCr.Cb += 128;
+            prev->YCbCr.Cr += 128;
+            im[i * mcu_width + j] = make_pixel(clamp(prev->YCbCr.Y + 1.402 * (prev->YCbCr.Cr - 128)),
+                                clamp(prev->YCbCr.Y - 0.34414 * (prev->YCbCr.Cb - 128) - 0.71414 * (prev->YCbCr.Cr - 128)),
+                                clamp(prev->YCbCr.Y + 1.772 * (prev->YCbCr.Cb - 128)));
+            free(prev);
+            /*printf("x%x%x%x ", im[i * mcu_width + j]->RGB.R, im[i * mcu_width + j]->RGB.G, im[i * mcu_width + j]->RGB.B);
+            if (j == 15)
+                printf("\n");*/
+        }
     return im;
 }
 
-//Проверка в диапазоне 0-255
-static inline uchar clamp(int n) {
-    return n < 0 ? 0 : n > 255 ? 255 : n;
+//Выполнение рестарта
+uchar make_restart()
+{
+    ushort marker = get_word();
+    bits_align();
+    printf("marker: %x\n", marker);
+    if (marker >= RST0 && marker < RST7)
+    {
+        data_unit_init(num_of_comps);
+        return 1;
+    }
+    return 0;
 }
 
 //Чтение сегмента скана
@@ -291,36 +324,29 @@ void read_scan(pixel **im)
     data_unit_init(num_of_comps);
     ushort num_of_xmcu = 0; //Кол-во прочитанных mcu по x
     ushort num_of_ymcu = 0; //Кол-во прочитанных mcu по y
-    pixel **mcu = decode_mcu();
-    for (int i = num_of_xmcu; i < mcu_height; ++i)
-        for (int j = num_of_ymcu; j < mcu_width; ++j)
-        {
-            im[i * mcu_height + j] = mcu[i * mcu_height + j];
-        }
-        free(mcu);
-    for (int i = 0; i < 16; ++i)
-        for (int j= 0; j < 16; ++j)
-        {
-            printf("%d ", im[i * 16 + j]->YCbCr.Cr);
-                if (j == 15)
-                    printf("\n");
-        }
-    printf("\n");
-    for (int i = 0; i < 16; ++i)
-        for (int j= 0; j < 16; ++j)
+    for (int c = 0; c < 2; ++c)
+    {
+        for (int k = 0; k < restart_interval; ++k)
+    {
+        //printf("decode_mcu->%d\n", k);
+        pixel **mcu = decode_mcu();
+        for (int i = num_of_xmcu * mcu_height; i < mcu_height * (num_of_xmcu + 1); ++i)
+            for (int j = num_of_ymcu * mcu_width; j < mcu_width * (num_of_ymcu + 1); ++j)
             {
-                pixel *prev = im[i * 16 + j];
-                prev->YCbCr.Y += 128;
-                prev->YCbCr.Cb += 128;
-                prev->YCbCr.Cr += 128;
-                im[i * 16 + j] = make_pixel(clamp(prev->YCbCr.Y + 1.402 * (prev->YCbCr.Cr - 128)),
-                                    clamp(prev->YCbCr.Y - 0.34414 * (prev->YCbCr.Cb - 128) - 0.71414 * (prev->YCbCr.Cr - 128)),
-                                    clamp(prev->YCbCr.Y + 1.772 * (prev->YCbCr.Cb - 128)));
-                free(prev);
-                printf("x%x%x%x ", im[i * 16 + j]->RGB.R, im[i * 16 + j]->RGB.G, im[i * 16 + j]->RGB.B);
-                if (j == 15)
-                    printf("\n");
+                int mcu_i = i % mcu_width;
+                int mcu_j = j % mcu_height;
+                im[i * cur_image_width + j] = mcu[mcu_i * mcu_width + mcu_j];
             }
+            free(mcu);
+            ++num_of_ymcu;
+        //printf("\n");
+    }
+    if (!make_restart())
+    {
+        printf("make_restart -> Error: wrong marker\n");
+        return;
+    }
+    }
 }
 
 //Кодирование в .bmp
@@ -328,27 +354,28 @@ void encode_bmp(pixel **im)
 {
     char *name = "Aqours.bmp";
     set_bin_output(name);
-    uchar image_size = 16;//temporary
-    uint padding_size = image_size % 4;
-    uint size = 14 + 12 + image_size * image_size * 3 + padding_size * image_size;
+    uchar height = 16;//temporary
+    uchar width = cur_image_width;
+    uint padding_size = width % 4;
+    uint size = 14 + 12 + height * height * 3 + padding_size * height;
     put_char('B');
     put_char('M');
     put_int(size);
     put_int(0);
     put_int(0x1A);
     put_int(12);
-    put_short(image_size);
-    put_short(image_size);
+    put_short(width);
+    put_short(height);
     put_short(1);
     put_short(24);
 
-    for (int i = image_size - 1; i >= 0; --i)
+    for (int i = height - 1; i >= 0; --i)
     {
-        for (int j = 0; j < image_size; ++j)
+        for (int j = 0; j < width; ++j)
         {
-            put_char(im[i * image_size + j]->RGB.B);
-            put_char(im[i * image_size + j]->RGB.G);
-            put_char(im[i * image_size + j]->RGB.R);
+            put_char(im[i * width + j]->RGB.B);
+            put_char(im[i * width + j]->RGB.G);
+            put_char(im[i * width + j]->RGB.R);
         }
         for (int j = 0; j < padding_size; ++j)
             put_char(0);
@@ -368,9 +395,9 @@ void read_frame()
     read_frame_header();
     uchar s = 16;//размер изображения для теста
     pixel **image = calloc(s * s, sizeof(pixel*));
-    for (int i = 0; i < 16; ++i)
-        for (int j = 0; j < 16; ++j)
-            image[i * s + j] = make_pixel(0, 0, 0);
+    for (int i = 0; i < s; ++i)
+        for (int j = 0; j < cur_image_width; ++j)
+            image[i * cur_image_width + j] = make_pixel(0, 0, 0);
     read_scan(image);
     encode_bmp(image);
 }

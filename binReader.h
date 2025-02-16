@@ -15,5 +15,6 @@ ushort get_next_byte();
 ushort get_word();
 bit4 get_4bit();
 ushort get_bit();
+void bits_align();
 ushort get_bits(ushort n);
 ushort *get_array(ushort n);

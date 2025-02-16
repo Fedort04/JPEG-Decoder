@@ -7,7 +7,7 @@ FILE *read_src;
 ///"b" - big endianness, "l" - little endianness
 char cur_endianness = 'b';
 ///Счетчик бит в текущем байте
-ushort bit_count;
+int bit_count;
 ///Текущее значение байта для побитового чтения
 ushort cur_byte;
 ///Предыдущий байт для побитового чтения
@@ -108,6 +108,27 @@ ushort get_bit()
     }
     printf("get_bit -> Error");
     return -1;
+}
+
+//Пропускает оставшиеся биты текущего байта
+void bits_align()
+{
+    if (cur_endianness == 'b')
+    {
+        prev_byte = cur_byte;
+        cur_byte = get_byte();
+        bit_count = 8;
+    }
+    else if (cur_endianness == 'l')
+    {
+        prev_byte = cur_byte;
+        cur_byte = get_byte();
+        bit_count = -1;
+    }
+    else 
+    {
+        printf("bits_align -> Error: invalid endianes");
+    }
 }
 
 //Читает n бит

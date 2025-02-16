@@ -304,7 +304,7 @@ void print_data_unit(short *unit)
 //Декодирование одного блока 64
 short *decode_data_unit(uchar elem_id, huff_table *dc, huff_table *ac, ushort *quant_table)
 {
-    printf("decode_data_unit\n");
+    //printf("decode_data_unit\n");
     short *unit = calloc(UNIT_LEN, sizeof(short));
     for (int i = 0; i < UNIT_LEN; ++i)
         unit[i] = 0;
@@ -315,8 +315,8 @@ short *decode_data_unit(uchar elem_id, huff_table *dc, huff_table *ac, ushort *q
     dequant(unit, quant_table);
     unit = zig_zag_order(unit);
     //print_data_unit(unit);
-    inverse_cosin_new(unit);
-    print_data_unit(unit);
+    inverse_cosin(unit);
+    //print_data_unit(unit);
     return unit;
 }
 
