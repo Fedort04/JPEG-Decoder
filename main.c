@@ -25,8 +25,9 @@ ushort start_spectral = 0; //Для прогрессивного
 ushort end_spectral = 63; //Для прогрессивного
 bit4 ahal;
 
-uchar const cur_restarts_num = 19;
-uint const cur_image_width = 16 * 5 * cur_restarts_num;
+//uchar const cur_restarts_num = 19;
+//uint const cur_image_width = 16 * 5 * cur_restarts_num;
+//uint const cur_image_height = 16 * 10;
 
 //Чтение маркера marker
 //return 1, если маркер прочитан корректно
@@ -324,30 +325,35 @@ void read_scan(pixel **im)
     printf("scan_header -> complete\n");
     //Example-----
     data_unit_init(num_of_comps);
-    ushort num_of_xmcu = 0; //Кол-во прочитанных mcu по x
-    ushort num_of_ymcu = 0; //Кол-во прочитанных mcu по y
-    for (int c = 0; c < cur_restarts_num; ++c)
-    {
-        for (int k = 0; k < restart_interval; ++k)
-    {
-        printf("decode_mcu -> interval:%d  mcu%d\n", c, k);
-        pixel **mcu = decode_mcu();
-        for (int i = num_of_xmcu * mcu_height; i < mcu_height * (num_of_xmcu + 1); ++i)
-            for (int j = num_of_ymcu * mcu_width; j < mcu_width * (num_of_ymcu + 1); ++j)
+    //ushort num_of_xmcu = 0; //Кол-во прочитанных mcu по x
+    //ushort num_of_ymcu = 0; //Кол-во прочитанных mcu по y
+    uint mcu_count = 0; //Общее кол-во прочитанных mcu
+    for (int row = 0; row < (image_height + (mcu_height - 1)) / mcu_height; ++row)
+    {   
+        for (int col = 0; col < (image_width + (mcu_width - 1)) / mcu_width; ++col)
+        {
+            //printf("decode_mcu -> interval:%d  mcu%d\n", c);
+            pixel **mcu = decode_mcu();
+            for (int i = row * mcu_height; i < mcu_height * (row + 1); ++i)
+                for (int j = col * mcu_width; j < mcu_width * (col + 1) && j < image_width; ++j)
+                {
+                    int mcu_i = i % mcu_width;
+                    int mcu_j = j % mcu_height;
+                    im[i * image_width + j] = mcu[mcu_i * mcu_width + mcu_j];
+                }
+                free(mcu);
+                //++num_of_ymcu;
+                ++mcu_count;
+            //printf("next_byte: %x\n", get_next_byte());
+            if (mcu_count % restart_interval == 0 && !make_restart())
             {
-                int mcu_i = i % mcu_width;
-                int mcu_j = j % mcu_height;
-                im[i * cur_image_width + j] = mcu[mcu_i * mcu_width + mcu_j];
+                printf("make_restart -> Error: wrong marker\n");
+                return;
             }
-            free(mcu);
-            ++num_of_ymcu;
-        //printf("next_byte: %x\n", get_next_byte());
-    }
-    if (!make_restart())
-    {
-        printf("make_restart -> Error: wrong marker\n");
-        return;
-    }
+            //printf("num_of_mcu: %d\n", mcu_count);
+        }
+        //++num_of_xmcu;
+        //printf("num_of_xmcu: %d\n", num_of_xmcu);
     }
 }
 
@@ -356,8 +362,8 @@ void encode_bmp(pixel **im)
 {
     char *name = "Aqours.bmp";
     set_bin_output(name);
-    uint height = 16;//temporary
-    uint width = cur_image_width;
+    uint height = image_height;//temporary
+    uint width = image_width;
     uint padding_size = width % 4;
     uint size = 14 + 12 + height * width * 3 + padding_size * height;
     put_char('B');
@@ -395,11 +401,10 @@ void read_frame()
         return;
     }
     read_frame_header();
-    uchar s = 16;//размер изображения для теста
-    pixel **image = calloc(s * cur_image_width, sizeof(pixel*));
-    for (int i = 0; i < s; ++i)
-        for (int j = 0; j < cur_image_width; ++j)
-            image[i * cur_image_width + j] = make_pixel(0, 0, 0);
+    pixel **image = calloc(image_height * image_width, sizeof(pixel*));
+    for (int i = 0; i < image_height; ++i)
+        for (int j = 0; j < image_width; ++j)
+            image[i * image_width + j] = make_pixel(0, 0, 0);
     read_scan(image);
     encode_bmp(image);
 }
@@ -413,8 +418,6 @@ void read_jpeg(char *source)
         return;
     printf("SOI\n");
     read_frame();
-    printf("allGood\n");
-    printf("ppupupu %d\n", cur_image_width);
     if (!read_marker(EOI)) //Проверка конца файла
         return;
 }

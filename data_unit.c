@@ -29,7 +29,7 @@ void data_unit_init(uchar num_of_elem)
     prev = calloc(num_of_elem, sizeof(short));
     for (int i = 0; i < num_of_elem; ++i)
         prev[i] = 0;
-    printf("data_unit_init -> complete\n");
+    //printf("data_unit_init -> complete\n");
 }
 
 //Декодирование знака в потоке Хаффмана
